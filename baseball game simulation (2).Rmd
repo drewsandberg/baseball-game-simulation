@@ -1,0 +1,170 @@
+---
+title: "Untitled"
+author: "Drew Sandberg | RDO IT Analytics"
+date: "February 8, 2020"
+output: html_document
+---
+```{r}
+library(tidyverse)
+
+thrown.strike.pct = .675
+thrown.ball.pct = (1 - thrown.strike.pct)
+looking.strike.pct = .272
+nocontact.swinging.strike = .171
+
+
+called.strike.pct = looking.strike.pct + nocontact.swinging.strike
+fouled.pct = .279
+thrown.strike.bip = .278
+
+
+print(called.strike.pct + fouled.pct + thrown.strike.bip)
+
+bavg.against = .230
+ground.ball.pct = .422
+popup.pct = (1 - ground.ball.pct) * .13
+fly.ball.pct = (1 - ground.ball.pct) * (1 - popup.pct)
+
+#dbl.play.ground.ball = .09
+
+prob.1b = .6186
+prob.2b = .1804
+prob.3b = .0155
+prob.hr = .1340
+
+pitch.count.adj = crossing(balls = c(0:3),
+                           strikes = c(0:2))
+
+
+
+
+pitch.count.adj = cbind(pitch.count.adj, bavg.adj)
+
+```
+
+```{r}
+
+out = 0
+pr = ""
+pitches.thrown = 0
+bb = 0
+hh = 0
+kk = 0
+batters.avg = sample(c(215:350),size = 9, replace = TRUE)/1000
+batter.number = 0
+
+for (inning in 1:9){
+  out = 0
+  
+    while(out < 3) {
+      batter.number = if_else(batter.number == 9, 1, batter.number + 1)
+      bavg.against = batters.avg[batter.number]
+      bavg.adj = c(bavg.against + (bavg.against * .347), # 0-0
+             bavg.against + (bavg.against * .266), # 0-1
+             bavg.against - (bavg.against * .3867), # 0-2
+             bavg.against + (bavg.against * .266), # 1-0
+             bavg.against + (bavg.against * .2969), # 1-1
+             bavg.against - (bavg.against * .3516), # 1-2
+             bavg.against + (bavg.against * .367), # 2-0
+             bavg.against + (bavg.against * .3438), # 2-1
+             bavg.against - (bavg.against * .2852), # 2-2
+             bavg.against + (bavg.against * .59), # 3-0
+             bavg.against + (bavg.against * .418), # 3-1
+             bavg.against - (bavg.against * .1758)) # 3-2
+      
+      b = 0
+      s = 0
+      ab = 1
+      
+      #print(paste0("Batter ", batter.number, " | Avg: ", bavg.against))
+  
+      while(b < 4 & s < 3 & ab == 1){
+          bavg.against = pitch.count.adj[3] %>%
+          filter(pitch.count.adj[1] == b & pitch.count.adj[2] == s)
+          bavg.against = as.numeric(bavg.against)
+          pitch.outcome.prob = c(thrown.ball.pct, #ball
+                                 thrown.strike.pct * called.strike.pct, #called strike
+                                 thrown.strike.pct * fouled.pct, #fouled
+                                 thrown.strike.pct * thrown.strike.bip * (1 - bavg.against), #out
+                                 thrown.strike.pct * thrown.strike.bip * bavg.against) #hit
+          
+          hit.outcome.prob = c(prob.1b, prob.2b, prob.3b, prob.hr)
+          out.outcome.prob = c(popup.pct, fly.ball.pct, ground.ball.pct)
+          pitch_result = sample(c(1:5), size = 1, replace = TRUE, prob = pitch.outcome.prob)
+          hit_result = sample(c(1:4), size = 1, replace = TRUE, prob = hit.outcome.prob)
+          out_type = sample(c(1:3), size = 1, replace= TRUE, prob = out.outcome.prob)
+          
+          pitches.thrown = pitches.thrown + 1
+          
+          if(pitch_result == 1 & b < 3){
+            b = b + 1
+          }
+          if(pitch_result == 1 & b == 3){
+            b = b + 1
+            bb = bb + 1
+            pr = "Walk"
+            ab = 0
+           }
+          if(pitch_result == 2 & s < 2){
+            s = s + 1
+          }
+          if(pitch_result == 2 & s == 2){
+            s = s + 1
+            out = out + 1
+            kk = kk + 1
+            pr = paste0("Strikeout: ", out, " out")
+            ab = 0
+          }
+          if(pitch_result == 3 & s < 2){
+            s = s + 1
+            #removed code for foul ball with 2 strikes... just keep going.
+          }
+          if(pitch_result == 4 & out_type == 1){
+            out = out + 1
+            pr = paste0("Pop-up: ",out, " out.")
+            ab = 0
+          }
+          if(pitch_result == 4 & out_type == 2){
+            out = out + 1
+            pr = paste0("Fly ball: ",out, " out.")
+            ab = 0
+          }
+          if(pitch_result == 4 & out_type == 3){
+            out = out + 1
+            pr = paste0("Ground ball: ",out, " out.")
+            ab = 0
+          }
+          if(pitch_result == 5 & hit_result == 1){
+            pr = paste0("Single:")
+            hh = hh + 1
+            ab = 0
+          }
+          if(pitch_result == 5 & hit_result == 2){
+            pr = paste0("Double:")
+            hh = hh + 1
+            ab = 0
+          }
+          if(pitch_result == 5 & hit_result == 3){
+            pr = paste0("Triple:")
+            hh = hh + 1
+            ab = 0
+          }
+          if(pitch_result == 5 & hit_result == 4){
+            pr = paste0("Home Run:")
+            hh = hh + 1
+            ab = 0
+        }
+      }
+        print(paste0("Batter: ", batter.number, " ", pr))
+        
+    } #end while
+  
+  #inning end summary
+  print(paste0("End of inning: ", inning))
+}
+
+#game simulation summary
+print(paste0("BB: ", bb, " | HITS: ", hh, " | K: ", kk, " | Pitches Thrown: ", pitches.thrown))
+
+```
+
